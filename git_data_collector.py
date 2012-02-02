@@ -2,9 +2,9 @@ import datetime
 import re
 
 #Our project imports
-from DataCollector import DataCollector
-import CommandLineProcessor
-import SortingTools
+from data_collector import DataCollector
+from command_line_processor import *
+from sorting_tools import *
 
 
 class GitDataCollector(DataCollector):
@@ -16,7 +16,7 @@ class GitDataCollector(DataCollector):
 		DataCollector.collect(self, dir)
 
 		try:
-			self.total_authors = int(CommandLineProcessor.getpipeoutput(['git log', 'git shortlog -s', 'wc -l']))
+			self.total_authors = int(getpipeoutput(['git log', 'git shortlog -s', 'wc -l']))
 		except:
 			self.total_authors = 0
 		#self.total_lines = int(getoutput('git-ls-files -z |xargs -0 cat |wc -l'))
@@ -55,14 +55,14 @@ class GitDataCollector(DataCollector):
 
 		# tags
 		self.tags = {}
-		lines = CommandLineProcessor.getpipeoutput(['git show-ref --tags']).split('\n')
+		lines = getpipeoutput(['git show-ref --tags']).split('\n')
 		for line in lines:
 			if len(line) == 0:
 				continue
 			(hash, tag) = line.split(' ')
 
 			tag = tag.replace('refs/tags/', '')
-			output = CommandLineProcessor.getpipeoutput(['git log "%s" --pretty=format:"%%at %%an" -n 1' % hash])
+			output = getpipeoutput(['git log "%s" --pretty=format:"%%at %%an" -n 1' % hash])
 			if len(output) > 0:
 				parts = output.split(' ')
 				stamp = 0
@@ -79,7 +79,7 @@ class GitDataCollector(DataCollector):
 			cmd = 'git shortlog -s "%s"' % tag
 			if prev != None:
 				cmd += ' "^%s"' % prev
-			output = CommandLineProcessor.getpipeoutput([cmd])
+			output = getpipeoutput([cmd])
 			if len(output) == 0:
 				continue
 			prev = tag
@@ -92,7 +92,7 @@ class GitDataCollector(DataCollector):
 
 		# Collect revision statistics
 		# Outputs "<stamp> <date> <time> <timezone> <author> '<' <mail> '>'"
-		lines = CommandLineProcessor.getpipeoutput(['git rev-list --pretty=format:"%at %ai %an <%aE>" HEAD', 'grep -v ^commit']).split('\n')
+		lines = getpipeoutput(['git rev-list --pretty=format:"%at %ai %an <%aE>" HEAD', 'grep -v ^commit']).split('\n')
 		for line in lines:
 			parts = line.split(' ', 4)
 			author = ''
@@ -196,7 +196,7 @@ class GitDataCollector(DataCollector):
 		# TODO Optimize this, it's the worst bottleneck
 		# outputs "<stamp> <files>" for each revision
 		self.files_by_stamp = {} # stamp -> files
-		revlines = CommandLineProcessor.getpipeoutput(['git rev-list --pretty=format:"%at %T" HEAD', 'grep -v ^commit']).strip().split('\n')
+		revlines = getpipeoutput(['git rev-list --pretty=format:"%at %T" HEAD', 'grep -v ^commit']).strip().split('\n')
 		lines = []
 		for revline in revlines:
 			time, rev = revline.split(' ')
@@ -216,7 +216,7 @@ class GitDataCollector(DataCollector):
 
 		# extensions
 		self.extensions = {} # extension -> files, lines
-		lines = CommandLineProcessor.getpipeoutput(['git ls-tree -r -z HEAD']).split('\000')
+		lines = getpipeoutput(['git ls-tree -r -z HEAD']).split('\000')
 		self.total_files = len(lines)
 		for line in lines:
 			if len(line) == 0:
@@ -246,7 +246,7 @@ class GitDataCollector(DataCollector):
 		#  N files changed, N insertions (+), N deletions(-)
 		# <stamp> <author>
 		self.changes_by_date = {} # stamp -> { files, ins, del }
-		lines = CommandLineProcessor.getpipeoutput(['git log --shortstat --pretty=format:"%at %an"']).split('\n')
+		lines = getpipeoutput(['git log --shortstat --pretty=format:"%at %an"']).split('\n')
 		lines.reverse()
 		files = 0; inserted = 0; deleted = 0; total_lines = 0
 		author = None
@@ -286,7 +286,7 @@ class GitDataCollector(DataCollector):
 	def refine(self):
 		# authors
 		# name -> {place_by_commits, commits_frac, date_first, date_last, timedelta}
-		authors_by_commits = SortingTools.getkeyssortedbyvaluekey(self.authors, 'commits')
+		authors_by_commits = getkeyssortedbyvaluekey(self.authors, 'commits')
 		authors_by_commits.reverse() # most first
 		for i, name in enumerate(authors_by_commits):
 			self.authors[name]['place_by_commits'] = i + 1
@@ -314,7 +314,7 @@ class GitDataCollector(DataCollector):
 		return self.authors[author]
 	
 	def getAuthors(self, limit = None):
-		res = SortingTools.getkeyssortedbyvaluekey(self.authors, 'commits')
+		res = getkeyssortedbyvaluekey(self.authors, 'commits')
 		res.reverse()
 		return res[:limit]
 	
@@ -331,7 +331,7 @@ class GitDataCollector(DataCollector):
 		try:
 			res = self.cache['files_in_tree'][rev]
 		except:
-			res = int(CommandLineProcessor.getpipeoutput(['git ls-tree -r --name-only "%s"' % rev, 'wc -l']).split('\n')[0])
+			res = int(getpipeoutput(['git ls-tree -r --name-only "%s"' % rev, 'wc -l']).split('\n')[0])
 			if 'files_in_tree' not in self.cache:
 				self.cache['files_in_tree'] = {}
 			self.cache['files_in_tree'][rev] = res
@@ -348,14 +348,14 @@ class GitDataCollector(DataCollector):
 		try:
 			res = self.cache['lines_in_blob'][sha1]
 		except:
-			res = int(CommandLineProcessor.getpipeoutput(['git cat-file blob %s' % sha1, 'wc -l']).split()[0])
+			res = int(getpipeoutput(['git cat-file blob %s' % sha1, 'wc -l']).split()[0])
 			if 'lines_in_blob' not in self.cache:
 				self.cache['lines_in_blob'] = {}
 			self.cache['lines_in_blob'][sha1] = res
 		return res
 
 	def getTags(self):
-		lines = CommandLineProcessor.getpipeoutput(['git show-ref --tags', 'cut -d/ -f3'])
+		lines = getpipeoutput(['git show-ref --tags', 'cut -d/ -f3'])
 		return lines.split('\n')
 	
 	def getTagDate(self, tag):
@@ -374,5 +374,5 @@ class GitDataCollector(DataCollector):
 		return self.total_lines
 	
 	def revToDate(self, rev):
-		stamp = int(CommandLineProcessor.getpipeoutput(['git log --pretty=format:%%at "%s" -n 1' % rev]))
+		stamp = int(getpipeoutput(['git log --pretty=format:%%at "%s" -n 1' % rev]))
 		return datetime.datetime.fromtimestamp(stamp).strftime('%Y-%m-%d')	

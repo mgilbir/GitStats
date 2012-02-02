@@ -7,28 +7,9 @@ import sys
 import time
 
 #Our project imports
-from GitDataCollector import GitDataCollector
-from HTMLReportCreator import HTMLReportCreator
-import CommandLineProcessor
-
-exectime_internal = 0.0
-time_start = time.time()
-
-# By default, gnuplot is searched from path, but can be overridden with the
-# environment variable "GNUPLOT"
-gnuplot_cmd = 'gnuplot'
-if 'GNUPLOT' in os.environ:
-	gnuplot_cmd = os.environ['GNUPLOT']
-
-conf = {
-	'max_domains': 10,
-	'max_ext_length': 10,
-	'style': 'gitstats.css',
-	'max_authors': 20,
-	'gnuplot_cmd': gnuplot_cmd,
-	'image_type': 'svg',  # everything that gnuplot accepts, I guess 
-	'gnuplot_image_specifications': {'svg':'','png':'transparent'}
-}
+from git_data_collector import GitDataCollector
+from html_report_creator import HTMLReportCreator
+from command_line_processor import *
 
 class GitStats:
 	def run(self, args_orig):
@@ -90,8 +71,20 @@ Default config values:
 
 		time_end = time.time()
 		exectime_internal = time_end - time_start
-		exectime_external = CommandLineProcessor.getexectimeexternal()
+		exectime_external = getexectimeexternal()
 		print 'Execution time %.5f secs, %.5f secs (%.2f %%) in external commands)' % (exectime_internal, exectime_external, (100.0 * exectime_external) / exectime_internal)
 
-g = GitStats()
-g.run(sys.argv[1:])
+if __name__ == "__main__":
+	exectime_internal = 0.0
+	time_start = time.time()
+
+	conf = {
+		'max_domains': 10,
+		'max_ext_length': 10,
+		'style': 'gitstats.css',
+		'max_authors': 20,
+		'image_type': 'svg'  # everything that gnuplot accepts, I guess 
+	}
+
+	g = GitStats()
+	g.run(sys.argv[1:])
